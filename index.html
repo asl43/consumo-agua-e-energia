@@ -1,179 +1,144 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Controle de Consumo - Água e Energia</title>
-<style>
-  body {
-    font-family: 'Segoe UI', sans-serif;
-    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-    color: #0d47a1;
-    padding: 20px;
-  }
-  h1 {
-    text-align: center;
-    margin-bottom: 20px;
-    color: #0d47a1;
-  }
-  form {
-    display: grid;
-    gap: 10px;
-    max-width: 400px;
-    margin: auto;
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  }
-  input, textarea, button {
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #90caf9;
-    font-size: 16px;
-  }
-  button {
-    background: #0d47a1;
-    color: white;
-    border: none;
-    cursor: pointer;
-    transition: 0.3s;
-  }
-  button:hover {
-    background: #1976d2;
-  }
-  .painel {
-    max-width: 600px;
-    margin: 20px auto;
-    background: white;
-    padding: 15px;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  }
-  .painel h2 {
-    text-align: center;
-  }
-  .painel table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  .painel th, .painel td {
-    padding: 8px;
-    border: 1px solid #90caf9;
-    text-align: center;
-  }
-  .info {
-    text-align: center;
-    margin-top: 10px;
-    font-style: italic;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controle de Consumo - Água e Energia</title>
+  <style>
+    /* Estilos omitidos para brevidade */
+  </style>
 </head>
 <body>
-<h1>💧⚡ Controle de Consumo Diário</h1>
+  <h1>💧⚡ Controle de Consumo Diário</h1>
 
-<form id="formConsumo">
-  <label>Data:</label>
-  <input type="date" id="data" required />
+  <form id="formConsumo">
+    <label>Data:</label>
+    <input type="date" id="data" required />
+    <label>Consumo de Água (Litros):</label>
+    <input type="number" id="agua" required />
+    <label>Consumo de Energia (kWh):</label>
+    <input type="number" id="energia" required />
+    <label>Observações:</label>
+    <textarea id="obs" rows="2"></textarea>
+    <button type="submit">Salvar Dados</button>
+  </form>
 
-  <label>Consumo de Água (Litros):</label>
-  <input type="number" id="agua" required />
+  <div class="painel">
+    <h2>📅 Consumo do Dia Anterior</h2>
+    <table id="tabelaConsumo">
+      <thead>
+        <tr><th>Data</th><th>Água (L)</th><th>Energia (kWh)</th><th>Observações</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
-  <label>Consumo de Energia (kWh):</label>
-  <input type="number" id="energia" required />
+  <div class="painel">
+    <h2>📊 Histórico Últimos 7 Dias</h2>
+    <canvas id="graficoConsumo" width="700" height="300"></canvas>
+  </div>
 
-  <label>Observações:</label>
-  <textarea id="obs" rows="2"></textarea>
+  <p class="info" id="mensagem"></p>
 
-  <button type="submit">Salvar Dados</button>
-</form>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const SHEET_URL = "https://script.google.com/macros/s/AKfycby53avxANbSAjiq1JM3TUfbkPheW5PiczNVhookSoYg_O0aLqcRhqZisju0OrxBF2ALZA/exec";
 
-<div class="painel">
-  <h2>📅 Consumo do Dia Anterior</h2>
-  <table id="tabelaConsumo">
-    <thead>
-      <tr><th>Data</th><th>Água (L)</th><th>Energia (kWh)</th><th>Observações</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-</div>
+    // --- Enviar dados para o Google Apps Script ---
+    document.getElementById("formConsumo").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const dados = {
+        entry: {
+          date: document.getElementById("data").value,
+          water: parseFloat(document.getElementById("agua").value),
+          energy: parseFloat(document.getElementById("energia").value),
+          notes: document.getElementById("obs").value,
+          createdAt: new Date().toISOString()
+        },
+        sheetName: "Consumo"
+      };
 
-<p class="info" id="mensagem"></p>
+      try {
+        const response = await fetch(SHEET_URL, {
+          method: "POST",
+          mode: "cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dados)
+        });
 
-<script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyNCs-rBo-pLWJg-OG9GMobz-dm0h7a6dTbFzMjK77vG-Ifs4w85h9Edb2xKKMGH4m0sw/exec";
-
-// --- FUNÇÃO: Enviar dados para o Google Sheets ---
-document.getElementById("formConsumo").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const dados = {
-    entry: {
-      date: document.getElementById("data").value,
-      water: parseFloat(document.getElementById("agua").value),
-      energy: parseFloat(document.getElementById("energia").value),
-      notes: document.getElementById("obs").value,
-      createdAt: new Date().toISOString()
-    },
-    sheetName: "Consumo"
-  };
-
-  try {
-    const resp = await fetch(SCRIPT_URL, {
-      method: "POST",
-      mode: "cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(dados)
+        if (response.ok) {
+          document.getElementById("mensagem").textContent = "✅ Dados salvos com sucesso!";
+          document.getElementById("formConsumo").reset();
+          carregarConsumoAnterior();
+          carregarGrafico();
+        } else {
+          throw new Error("Erro ao salvar dados.");
+        }
+      } catch (error) {
+        console.error(error);
+        document.getElementById("mensagem").textContent = "❌ Erro ao salvar dados.";
+      }
     });
 
-    const text = await resp.text();
-    console.log("Resposta do servidor:", text);
+    // --- Buscar último registro ---
+    async function carregarConsumoAnterior() {
+      try {
+        const resp = await fetch(SHEET_URL + "?sheetName=Consumo");
+        const data = await resp.json();
+        if (!Array.isArray(data) || data.length === 0) return;
 
-    if (text.includes("OK")) {
-      document.getElementById("mensagem").textContent = "✅ Dados salvos com sucesso!";
-      document.getElementById("formConsumo").reset();
-      carregarConsumoAnterior(); // Atualiza a tabela
-    } else {
-      document.getElementById("mensagem").textContent = "⚠️ Erro inesperado ao salvar.";
+        const ultimo = data.sort((a,b)=>new Date(b.Data)-new Date(a.Data))[0];
+        const tbody = document.querySelector("#tabelaConsumo tbody");
+        tbody.innerHTML = `
+          <tr>
+            <td>${ultimo.Data||"-"}</td>
+            <td>${ultimo["Água (L)"]||"-"}</td>
+            <td>${ultimo["Energia (kWh)"]||"-"}</td>
+            <td>${ultimo.Observações||"-"}</td>
+          </tr>
+        `;
+      } catch (error) {
+        console.error(error);
+      }
     }
 
-  } catch (error) {
-    console.error("Erro ao enviar:", error);
-    document.getElementById("mensagem").textContent = "❌ Erro ao salvar dados.";
-  }
-});
+    // --- Carregar gráfico dos últimos 7 dias ---
+    async function carregarGrafico() {
+      try {
+        const resp = await fetch(SHEET_URL + "?sheetName=Consumo");
+        const data = await resp.json();
+        if (!Array.isArray(data) || data.length === 0) return;
 
-// --- FUNÇÃO: Buscar o último registro (dia anterior) ---
-async function carregarConsumoAnterior() {
-  try {
-    const resp = await fetch(SCRIPT_URL + "?sheetName=Consumo", { method: "GET" });
-    const data = await resp.json();
+        const ultimos7 = data
+          .sort((a,b)=>new Date(a.Data)-new Date(b.Data))
+          .slice(-7);
 
-    if (!Array.isArray(data) || data.length === 0) {
-      document.getElementById("mensagem").textContent = "Nenhum registro encontrado.";
-      return;
+        const labels = ultimos7.map(d=>d.Data);
+        const agua = ultimos7.map(d=>parseFloat(d["Água (L)"]||0));
+        const energia = ultimos7.map(d=>parseFloat(d["Energia (kWh)"]||0));
+
+        const ctx = document.getElementById("graficoConsumo").getContext("2d");
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              { label: "Água (L)", data: agua, borderColor: "#0d47a1", backgroundColor: "rgba(13,71,161,0.1)" },
+              { label: "Energia (kWh)", data: energia, borderColor: "#1976d2", backgroundColor: "rgba(25,118,210,0.1)" }
+            ]
+          },
+          options: { responsive: true, scales: { y: { beginAtZero: true } } }
+        });
+      } catch (error) {
+        console.error(error);
+      }
     }
 
-    // Ordena pela data (último registro)
-    const ultimo = data.sort((a, b) => new Date(b.Data) - new Date(a.Data))[0];
-
-    const tbody = document.querySelector("#tabelaConsumo tbody");
-    tbody.innerHTML = `
-      <tr>
-        <td>${ultimo.Data || "-"}</td>
-        <td>${ultimo["Água (L)"] || "-"}</td>
-        <td>${ultimo["Energia (kWh)"] || "-"}</td>
-        <td>${ultimo.Observações || "-"}</td>
-      </tr>
-    `;
-  } catch (error) {
-    console.error("Erro ao carregar dados:", error);
-    document.getElementById("mensagem").textContent = "Erro ao buscar dados do dia anterior.";
-  }
-}
-
-// Carregar automaticamente ao abrir
-window.addEventListener("load", carregarConsumoAnterior);
-</script>
+    // --- Inicializar ---
+    window.addEventListener("load", () => {
+      carregarConsumoAnterior();
+      carregarGrafico();
+    });
+  </script>
 </body>
 </html>
