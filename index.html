@@ -101,11 +101,12 @@
 <p class="info" id="mensagem"></p>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwc3IGUpPG1s4HI78llPgxqn6sXaW0YfuX9d1PpR6yc4Yhp77M2PZXPhTrh_FU1d5AGMg/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyNCs-rBo-pLWJg-OG9GMobz-dm0h7a6dTbFzMjK77vG-Ifs4w85h9Edb2xKKMGH4m0sw/exec";
 
-// Envia dados para o Google Sheets
+// --- FUNÇÃO: Enviar dados para o Google Sheets ---
 document.getElementById("formConsumo").addEventListener("submit", async (e) => {
   e.preventDefault();
+
   const dados = {
     entry: {
       date: document.getElementById("data").value,
@@ -126,18 +127,23 @@ document.getElementById("formConsumo").addEventListener("submit", async (e) => {
     });
 
     const text = await resp.text();
-    document.getElementById("mensagem").textContent = "✅ Dados salvos com sucesso!";
-    console.log("Resposta:", text);
+    console.log("Resposta do servidor:", text);
 
-    // Atualiza tabela automaticamente
-    carregarConsumoAnterior();
+    if (text.includes("OK")) {
+      document.getElementById("mensagem").textContent = "✅ Dados salvos com sucesso!";
+      document.getElementById("formConsumo").reset();
+      carregarConsumoAnterior(); // Atualiza a tabela
+    } else {
+      document.getElementById("mensagem").textContent = "⚠️ Erro inesperado ao salvar.";
+    }
+
   } catch (error) {
     console.error("Erro ao enviar:", error);
     document.getElementById("mensagem").textContent = "❌ Erro ao salvar dados.";
   }
 });
 
-// Busca dados do dia anterior automaticamente
+// --- FUNÇÃO: Buscar o último registro (dia anterior) ---
 async function carregarConsumoAnterior() {
   try {
     const resp = await fetch(SCRIPT_URL + "?sheetName=Consumo", { method: "GET" });
@@ -148,15 +154,16 @@ async function carregarConsumoAnterior() {
       return;
     }
 
-    // Ordenar por data (último registro)
-    const ultimoDia = data.sort((a, b) => new Date(b.Data) - new Date(a.Data))[0];
+    // Ordena pela data (último registro)
+    const ultimo = data.sort((a, b) => new Date(b.Data) - new Date(a.Data))[0];
+
     const tbody = document.querySelector("#tabelaConsumo tbody");
     tbody.innerHTML = `
       <tr>
-        <td>${ultimoDia.Data || "-"}</td>
-        <td>${ultimoDia["Água (L)"] || "-"}</td>
-        <td>${ultimoDia["Energia (kWh)"] || "-"}</td>
-        <td>${ultimoDia.Observações || "-"}</td>
+        <td>${ultimo.Data || "-"}</td>
+        <td>${ultimo["Água (L)"] || "-"}</td>
+        <td>${ultimo["Energia (kWh)"] || "-"}</td>
+        <td>${ultimo.Observações || "-"}</td>
       </tr>
     `;
   } catch (error) {
@@ -165,7 +172,7 @@ async function carregarConsumoAnterior() {
   }
 }
 
-// Carrega automaticamente ao abrir
+// Carregar automaticamente ao abrir
 window.addEventListener("load", carregarConsumoAnterior);
 </script>
 </body>
