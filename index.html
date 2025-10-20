@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Consumo - Água e Energia</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body {
+    font-family: "Segoe UI", sans-serif;
+    background: linear-gradient(180deg, #e8f6ff, #cdeaff);
+    color: #222;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px;
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #005f9e;
+    text-shadow: 1px 1px 2px #b0dfff;
+  }
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    width: 100%;
+    max-width: 600px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+  }
+  label { display: block; margin-top: 10px; font-weight: 600; }
+  input, select, textarea, button {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    margin-top: 5px;
+  }
+  button {
+    background: #0078d7;
+    color: white;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  button:hover { background: #005fa3; }
+  .stats {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    font-weight: bold;
+    color: #0078d7;
+  }
+  #yesterday {
+    background: #e9f7ff;
+    border-left: 5px solid #0078d7;
+    padding: 10px;
+    margin-top: 15px;
+    border-radius: 8px;
+  }
+  canvas {
+    margin-top: 30px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 10px;
+  }
+  .filters {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    margin-top: 15px;
+    flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+
+<h1>💧⚡ Controle Diário de Consumo</h1>
+
+<div class="card">
+  <label>Data:</label>
+  <input type="date" id="date" required>
+
+  <label>Consumo de Água (litros):</label>
+  <input type="number" id="water" placeholder="Ex: 150">
+
+  <label>Consumo de Energia (kWh):</label>
+  <input type="number" id="energy" placeholder="Ex: 10.5">
+
+  <label>Observações:</label>
+  <textarea id="notes" rows="3" placeholder="Ex: Dia quente, lavei roupas"></textarea>
+
+  <button onclick="saveData()">💾 Salvar Consumo</button>
+
+  <div class="filters">
+    <div>
+      <label for="monthSelect">Mês:</label>
+      <select id="monthSelect"></select>
+    </div>
+    <div>
+      <label for="yearSelect">Ano:</label>
+      <select id="yearSelect"></select>
+    </div>
+    <button onclick="updateDashboard()">🔄 Atualizar</button>
+  </div>
+
+  <div class="stats">
+    <div>Total de Água: <span id="totalWater">0</span> L</div>
+    <div>Total de Energia: <span id="totalEnergy">0</span> kWh</div>
+  </div>
+
+  <div id="yesterday">
+    <strong>Ontem:</strong>
+    <div>Água: <span id="yesterdayWater">-</span> L</div>
+    <div>Energia: <span id="yesterdayEnergy">-</span> kWh</div>
+  </div>
+</div>
+
+<canvas id="consumoChart" width="600" height="300"></canvas>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbwc3IGUpPG1s4HI78llPgxqn6sXaW0YfuX9d1PpR6yc4Yhp77M2PZXPhTrh_FU1d5AGMg/exec";
+let chartInstance;
+
+// Preenche selects de mês e ano
+function initFilters() {
+  const monthSelect = document.getElementById("monthSelect");
+  const yearSelect = document.getElementById("yearSelect");
+  const months = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  
+  months.forEach((m,i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.text = m;
+    monthSelect.appendChild(opt);
+  });
+
+  const currentYear = new Date().getFullYear();
+  for(let y = currentYear - 2; y <= currentYear + 1; y++) {
+    const opt = document.createElement("option");
+    opt.value = y;
+    opt.text = y;
+    yearSelect.appendChild(opt);
+  }
+
+  monthSelect.value = new Date().getMonth();
+  yearSelect.value = currentYear;
+}
+
+document.getElementById('date').valueAsDate = new Date();
+
+async function saveData() {
+  const entry = {
+    id: Date.now(),
+    date: document.getElementById("date").value,
+    water: parseFloat(document.getElementById("water").value) || 0,
+    energy: parseFloat(document.getElementById("energy").value) || 0,
+    notes: document.getElementById("notes").value,
+    createdAt: new Date().toISOString()
+  };
+
+  if (!entry.date) return alert("Por favor, selecione uma data!");
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify({ entry }),
+      headers: { "Content-Type": "application/json" }
+    });
+
+    if (response.ok) {
+      alert("✅ Consumo salvo e sincronizado!");
+      clearFields();
+      await updateDashboard();
+    } else {
+      alert("⚠️ Falha ao sincronizar.");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Erro: " + err.message);
+  }
+}
+
+function clearFields() {
+  document.getElementById("water").value = "";
+  document.getElementById("energy").value = "";
+  document.getElementById("notes").value = "";
+}
+
+async function loadYesterdayData(data) {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yDate = yesterday.toISOString().split("T")[0];
+
+  const yesterdayEntry = data.find(d => {
+    const entryDate = new Date(d["Data"]).toISOString().split("T")[0];
+    return entryDate === yDate;
+  });
+
+  if (yesterdayEntry) {
+    document.getElementById("yesterdayWater").textContent = yesterdayEntry["Água (L)"];
+    document.getElementById("yesterdayEnergy").textContent = yesterdayEntry["Energia (kWh)"];
+  } else {
+    document.getElementById("yesterdayWater").textContent = "-";
+    document.getElementById("yesterdayEnergy").textContent = "-";
+  }
+}
+
+async function updateDashboard() {
+  try {
+    const month = parseInt(document.getElementById("monthSelect").value);
+    const year = parseInt(document.getElementById("yearSelect").value);
+    const response = await fetch(API_URL);
+    const data = await response.json();
+    if (!Array.isArray(data)) return;
+
+    let totalWater = 0, totalEnergy = 0;
+    const days = [], waterData = [], energyData = [];
+
+    data.forEach(d => {
+      const entryDate = new Date(d["Data"]);
+      if (entryDate.getMonth() === month && entryDate.getFullYear() === year) {
+        days.push(entryDate.getDate());
+        waterData.push(Number(d["Água (L)"]) || 0);
+        energyData.push(Number(d["Energia (kWh)"]) || 0);
+        totalWater += Number(d["Água (L)"]) || 0;
+        totalEnergy += Number(d["Energia (kWh)"]) || 0;
+      }
+    });
+
+    document.getElementById("totalWater").textContent = totalWater.toFixed(1);
+    document.getElementById("totalEnergy").textContent = totalEnergy.toFixed(1);
+    loadYesterdayData(data);
+    renderChart(days, waterData, energyData, month, year);
+  } catch (err) {
+    console.error("Erro ao atualizar painel:", err);
+  }
+}
+
+function renderChart(days, waterData, energyData, month, year) {
+  const ctx = document.getElementById("consumoChart").getContext("2d");
+  if (chartInstance) chartInstance.destroy();
+
+  chartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: days,
+      datasets: [
+        { label: "Água (L)", data: waterData, borderColor: "#0096ff", backgroundColor: "rgba(0,150,255,0.2)", fill: true, tension: 0.3 },
+        { label: "Energia (kWh)", data: energyData, borderColor: "#ff6600", backgroundColor: "rgba(255,102,0,0.2)", fill: true, tension: 0.3 }
+      ]
+    },
+    options: {
+      plugins: { 
+        legend: { position: "top" },
+        title: { display: true, text: `Consumo de ${getMonthName(month)} / ${year}`, font: { size: 16 } }
+      },
+      scales: {
+        x: { title: { display: true, text: "Dia do Mês" } },
+        y: { title: { display: true, text: "Consumo" }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function getMonthName(i) {
+  const months = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  return months[i];
+}
+
+// Inicializa sistema
+window.onload = () => {
+  initFilters();
+  updateDashboard();
+};
+</script>
+
+</body>
+</html>
